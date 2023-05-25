@@ -1,10 +1,7 @@
 "use client";
-import Image from "next/image";
 import styles from "./page.module.css";
-import React, { useEffect, useState } from "react";
-import { Racing_Sans_One, Ribeye } from "next/font/google";
-import grid from "./grid";
-import { BlockPicker, SketchPicker } from "react-color";
+import React, { useEffect, useRef, useState } from "react";
+import {  SketchPicker } from "react-color";
 
 const GRID_SIZE = "16px";
 const INIT_BG = "#fff";
@@ -13,6 +10,7 @@ const Grid = ({ rows, columns }) => {
     new Array(rows).fill(0).map(() => new Array(columns).fill(INIT_BG))
   );
 
+  const gridDataChangingCopy = useRef(null);
   //creating state to store our color and also set color using onChange event for block picker
   const [sketchPickerColor, setSketchPickerColor] = useState("#37d67a");
   const [ws, setWs] = useState(null);
@@ -29,9 +27,10 @@ const Grid = ({ rows, columns }) => {
     return false; // All elements are "#FFF"
   }
 
+  const copy =(twoDArr) => JSON.parse(JSON.stringify(twoDArr))
+
   useEffect(() => {
-    console.log(gridData.length);
-    console.log(gridData[0].length);
+    gridDataChangingCopy.current = gridData; 
   }, [gridData]);
   const getInitDataCall = { action: "whisper" };
   const paintCall = (x, y, hex) => ({
@@ -78,14 +77,23 @@ const Grid = ({ rows, columns }) => {
       } else {
         console.log("hi");
           //send own copy of  data as whisper
-          let { requester } = JSON.parse(e.data);
-          if (requester) {
+          try{
+
+            let { requester } = JSON.parse(e.data);
+            if (!requester) throw new Error("can't parse with requestor");
             console.log("send own copy of  data as whisper")
-            sendWhisper(requester, JSON.stringify(gridData));
-          }else{
+            sendWhisper(requester, JSON.stringify(gridDataChangingCopy.current));
+
+          }catch(err){
             //handle init data
             console.log("handle init data")
-            setGridData(JSON.parse(e.data))
+            try{
+
+              setGridData(JSON.parse(e.data))
+            }catch(err2){
+              console.log(err2.message)
+            }
+
           }
         console.log("end of hi");
       }
@@ -130,8 +138,9 @@ const Grid = ({ rows, columns }) => {
 
   }
   const paintOneGrid = (x, y, hex) => {
-    if (gridData[x][y] == hex) { return; }
-    const newGridData = [...gridData];
+    if (gridDataChangingCopy.current[x][y] == hex) { return; }
+    console.log(gridDataChangingCopy.current);
+    let newGridData =copy(gridDataChangingCopy.current);
     newGridData[x][y] = hex;
     setGridData(newGridData);
   };
@@ -149,6 +158,13 @@ const Grid = ({ rows, columns }) => {
         setIsDrag(true);
       }}
       onMouseUp={() => {
+        setIsDrag(false);
+      }}
+
+      onMouseLeave={()=>{
+        setIsDrag(false);
+      }}
+      onMouseEnter={()=>{
         setIsDrag(false);
       }}
     >
@@ -197,6 +213,7 @@ const Grid = ({ rows, columns }) => {
                     if (isDrag && ws && ws.readyState == 1)
                       handleCellClick(rIdx, cIdx);
                   }}
+                  // onClick={()=>handleCellClick(rIdx, cIdx)}
                 ></div>
               ))
             }
